@@ -1,0 +1,25 @@
+# TODO
+- [x] Scopes
+- [x] If statements
+- [x] Virtual registers on stack
+- [x] While loops
+- [x] Allocate variables on the stack, rather than static memory
+- [x] Types (different sizes of integers)
+- [ ] Type checking
+- [ ] Pointers
+- [ ] Arrays
+- [ ] Strings (Arrays of bytes)
+- [ ] Linux syscalls
+- [ ] Functions
+- [ ] Data structures
+- [ ] Modules
+- [ ] Libraries (OIL barrels?)
+- [ ] Replace arrays/strings with data structures
+- [ ] Enums
+- [ ] Standard library, with:
+    - [ ] Memory allocation
+    - [ ] Dynamic arrays
+    - [ ] Hashmaps
+- [ ] Turing-complete (branflakes interpreter)
+- [ ] Self-host
+- [ ] Classes

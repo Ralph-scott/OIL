@@ -1,0 +1,6 @@
+a: int = 0; // ok
+b: s32 = a; // also ok
+c: s64 = a; // ok, but should be an error
+b: u8 = 65; // type error!
+
+0 // exit zero

@@ -1,0 +1,10 @@
+a: int = 0;
+b: int = 1;
+
+i: int = 0;
+while i < 10000000 {
+    a = a + b;
+    b = a - b;
+    i = i + 1;
+};
+a
