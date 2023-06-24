@@ -5,25 +5,28 @@
 #include "compile.h"
 #include "parser.h"
 #include "symbol_table.h"
+#include "types.h"
 #include "utils.h"
 
 AsmData compile_ast(Compiler *compiler, const AST *ast);
 
-static void compiler_codegen_data_name(Compiler *compiler, AsmData *data)
+static void compiler_codegen_data_name(Compiler *compiler, AsmData *data, DataTypeName *type)
 {
+    DataTypeName int_type = type && *type ? *type : data->int_type ? data->int_type : TYPE_INT32;
+
     switch (data->type) {
         case ASM_REGISTER: {
-            fprintf(compiler->file, "%s", REGISTER_TO_STRING[data->asm_register]);
+            fprintf(compiler->file, "%s", REGISTER_TO_STRING[data->asm_register][int_type]);
             break;
         }
 
         case ASM_STACK_REGISTER: {
-            fprintf(compiler->file, "QWORD [rsp + %zu]", 8 * (compiler->stack_registers_used - data->stack_register - 1));
+            fprintf(compiler->file, "%s [rsp + %zu]", INT_TYPE_ASM[int_type], 8 * (compiler->stack_registers_used - data->stack_register - 1));
             break;
         }
 
         case ASM_VARIABLE: {
-            fprintf(compiler->file, "QWORD [rsp + %zu]", 8 * (compiler->stack_registers_used + compiler->table.variable_id - data->variable.id - 1));
+            fprintf(compiler->file, "%s [rsp + %zu]", INT_TYPE_ASM[int_type], 8 * (compiler->stack_registers_used + compiler->table.variable_id - data->variable.id - 1));
             break;
         }
 
@@ -39,12 +42,14 @@ static AsmData compiler_alloc_register(Compiler *compiler)
         return (AsmData) {
             .type = ASM_REGISTER,
             // allocate a new register
+            .int_type = TYPE_INT64,
             .asm_register = compiler->registers[--compiler->registers_len]
         };
     } else {
         if (compiler->stack_register_pool_len > 0) {
             return (AsmData) {
                 .type = ASM_STACK_REGISTER,
+                .int_type = TYPE_INT64,
                 .stack_register = compiler->stack_register_pool[--compiler->stack_register_pool_len]
             };
         }
@@ -101,18 +106,22 @@ static void compiler_free_value(Compiler *compiler, const AsmData *data)
 static void compiler_mov(Compiler *compiler, AsmData *input, AsmData *output)
 {
     if (input->type == output->type && input->type != ASM_REGISTER) {
-        fprintf(compiler->file, "    mov rax, ");
-        compiler_codegen_data_name(compiler, output);
+        fprintf(compiler->file, "    mov ");
+        compiler_codegen_data_name(compiler, &(AsmData) { .type = ASM_REGISTER, .asm_register = REGISTER_RAX }, &output->int_type);
+        fprintf(compiler->file, ", ");
+        compiler_codegen_data_name(compiler, input, &output->int_type);
         fprintf(compiler->file, "\n");
 
         fprintf(compiler->file, "    mov ");
-        compiler_codegen_data_name(compiler, input);
-        fprintf(compiler->file, ", rax\n");
+        compiler_codegen_data_name(compiler, input, &output->int_type);
+        fprintf(compiler->file, ", ");
+        compiler_codegen_data_name(compiler, &(AsmData) { .type = ASM_REGISTER, .asm_register = REGISTER_RAX }, &output->int_type);
+        fprintf(compiler->file, "\n");
     } else {
         fprintf(compiler->file, "    mov ");
-        compiler_codegen_data_name(compiler, input);
+        compiler_codegen_data_name(compiler, input, &output->int_type);
         fprintf(compiler->file, ", ");
-        compiler_codegen_data_name(compiler, output);
+        compiler_codegen_data_name(compiler, output, &input->int_type);
         fprintf(compiler->file, "\n");
     }
 }
@@ -120,18 +129,22 @@ static void compiler_mov(Compiler *compiler, AsmData *input, AsmData *output)
 static void compiler_add(Compiler *compiler, AsmData *input, AsmData *output)
 {
     if (output->type != ASM_REGISTER) {
-        fprintf(compiler->file, "    mov rax, ");
-        compiler_codegen_data_name(compiler, output);
+        fprintf(compiler->file, "    mov ");
+        compiler_codegen_data_name(compiler, &(AsmData) { .type = ASM_REGISTER, .asm_register = REGISTER_RAX }, &output->int_type);
+        fprintf(compiler->file, ", ");
+        compiler_codegen_data_name(compiler, input, &output->int_type);
         fprintf(compiler->file, "\n");
 
         fprintf(compiler->file, "    add ");
-        compiler_codegen_data_name(compiler, input);
-        fprintf(compiler->file, ", rax\n");
+        compiler_codegen_data_name(compiler, input, &output->int_type);
+        fprintf(compiler->file, ", ");
+        compiler_codegen_data_name(compiler, &(AsmData) { .type = ASM_REGISTER, .asm_register = REGISTER_RAX }, &output->int_type);
+        fprintf(compiler->file, "\n");
     } else {
         fprintf(compiler->file, "    add ");
-        compiler_codegen_data_name(compiler, input);
+        compiler_codegen_data_name(compiler, input, &output->int_type);
         fprintf(compiler->file, ", ");
-        compiler_codegen_data_name(compiler, output);
+        compiler_codegen_data_name(compiler, output, &output->int_type);
         fprintf(compiler->file, "\n");
     }
 }
@@ -139,50 +152,63 @@ static void compiler_add(Compiler *compiler, AsmData *input, AsmData *output)
 static void compiler_sub(Compiler *compiler, AsmData *input, AsmData *output)
 {
     if (output->type != ASM_REGISTER) {
-        fprintf(compiler->file, "    mov rax, ");
-        compiler_codegen_data_name(compiler, output);
+        fprintf(compiler->file, "    mov ");
+        compiler_codegen_data_name(compiler, &(AsmData) { .type = ASM_REGISTER, .asm_register = REGISTER_RAX }, &output->int_type);
+        fprintf(compiler->file, ", ");
+        compiler_codegen_data_name(compiler, input, &output->int_type);
         fprintf(compiler->file, "\n");
 
         fprintf(compiler->file, "    sub ");
-        compiler_codegen_data_name(compiler, input);
-        fprintf(compiler->file, ", rax\n");
+        compiler_codegen_data_name(compiler, input, &output->int_type);
+        fprintf(compiler->file, ", ");
+        compiler_codegen_data_name(compiler, &(AsmData) { .type = ASM_REGISTER, .asm_register = REGISTER_RAX }, &output->int_type);
+        fprintf(compiler->file, "\n");
     } else {
         fprintf(compiler->file, "    sub ");
-        compiler_codegen_data_name(compiler, input);
+        compiler_codegen_data_name(compiler, input, &output->int_type);
         fprintf(compiler->file, ", ");
-        compiler_codegen_data_name(compiler, output);
+        compiler_codegen_data_name(compiler, output, &input->int_type);
         fprintf(compiler->file, "\n");
     }
 }
 
 static void compiler_mul(Compiler *compiler, AsmData *input, AsmData *output)
 {
-    fprintf(compiler->file, "    mov rax, ");
-    compiler_codegen_data_name(compiler, output);
+    fprintf(compiler->file, "    mov ");
+    compiler_codegen_data_name(compiler, &(AsmData) { .type = ASM_REGISTER, .asm_register = REGISTER_RAX }, &output->int_type);
+    fprintf(compiler->file, ", ");
+    compiler_codegen_data_name(compiler, output, &input->int_type);
     fprintf(compiler->file, "\n");
 
     fprintf(compiler->file, "    imul ");
-    compiler_codegen_data_name(compiler, input);
+    compiler_codegen_data_name(compiler, input, &output->int_type);
     fprintf(compiler->file, "\n");
 
     fprintf(compiler->file, "    mov ");
-    compiler_codegen_data_name(compiler, input);
-    fprintf(compiler->file, ", rax\n");
+    compiler_codegen_data_name(compiler, input, &output->int_type);
+    fprintf(compiler->file, ", ");
+    compiler_codegen_data_name(compiler, &(AsmData) { .type = ASM_REGISTER, .asm_register = REGISTER_RAX }, &output->int_type);
+    fprintf(compiler->file, "\n");
 }
 
 static void compiler_div(Compiler *compiler, AsmData *input, AsmData *output)
 {
-    fprintf(compiler->file, "    mov rax, ");
-    compiler_codegen_data_name(compiler, output);
+    fprintf(compiler->file, "    mov ");
+    compiler_codegen_data_name(compiler, &(AsmData) { .type = ASM_REGISTER, .asm_register = REGISTER_RAX }, &output->int_type);
+    fprintf(compiler->file, ", ");
+    fprintf(compiler->file, "\n");
+    compiler_codegen_data_name(compiler, output, &input->int_type);
     fprintf(compiler->file, "\n");
 
     fprintf(compiler->file, "    idiv ");
-    compiler_codegen_data_name(compiler, input);
+    compiler_codegen_data_name(compiler, input, &output->int_type);
     fprintf(compiler->file, "\n");
 
     fprintf(compiler->file, "    mov ");
-    compiler_codegen_data_name(compiler, input);
-    fprintf(compiler->file, ", rax\n");
+    compiler_codegen_data_name(compiler, input, &output->int_type);
+    fprintf(compiler->file, ", ");
+    compiler_codegen_data_name(compiler, &(AsmData) { .type = ASM_REGISTER, .asm_register = REGISTER_RAX }, &output->int_type);
+    fprintf(compiler->file, "\n");
 }
 
 static void compiler_lvalue(Compiler *compiler, AsmData *data)
@@ -216,6 +242,7 @@ static void compiler_rvalue(Compiler *compiler, AsmData *data)
 
         case ASM_VARIABLE: {
             AsmData asm_register = compiler_alloc_register(compiler);
+            asm_register.int_type = data->int_type;
 
             compiler_mov(compiler, &asm_register, data);
 
@@ -238,6 +265,7 @@ AsmData compile_node(Compiler *compiler, const Token *token)
 
             return (AsmData) {
                 .type = ASM_VARIABLE,
+                .int_type = variable.type.type,
                 .variable = variable
             };
         }
@@ -246,7 +274,7 @@ AsmData compile_node(Compiler *compiler, const Token *token)
             AsmData asm_register = compiler_alloc_register(compiler);
 
             fprintf(compiler->file, "    mov ");
-            compiler_codegen_data_name(compiler, &asm_register);
+            compiler_codegen_data_name(compiler, &asm_register, NULL);
             fprintf(compiler->file, ", %.*s\n", (int) token->len, token->text);
 
             return asm_register;
@@ -325,14 +353,16 @@ static AsmData compile_infix(Compiler *compiler, const ASTInfix *infix)
             compiler_rvalue(compiler, &rhs);
 
             fprintf(compiler->file, "    cmp ");
-            compiler_codegen_data_name(compiler, &lhs);
+            compiler_codegen_data_name(compiler, &lhs, &lhs.int_type);
             fprintf(compiler->file, ", ");
-            compiler_codegen_data_name(compiler, &rhs);
+            compiler_codegen_data_name(compiler, &rhs, &lhs.int_type);
             fprintf(compiler->file, "\n");
             fprintf(compiler->file, "    setg al\n");
             fprintf(compiler->file, "    mov ");
-            compiler_codegen_data_name(compiler, &lhs);
-            fprintf(compiler->file, ", rax\n");
+            compiler_codegen_data_name(compiler, &lhs, &lhs.int_type);
+            fprintf(compiler->file, ", ");
+            compiler_codegen_data_name(compiler, &(AsmData) { .type = ASM_REGISTER, .asm_register = REGISTER_RAX }, &lhs.int_type);
+            fprintf(compiler->file, "\n");
 
             compiler_free_value(compiler, &rhs);
 
@@ -347,14 +377,16 @@ static AsmData compile_infix(Compiler *compiler, const ASTInfix *infix)
             compiler_rvalue(compiler, &rhs);
 
             fprintf(compiler->file, "    cmp ");
-            compiler_codegen_data_name(compiler, &lhs);
+            compiler_codegen_data_name(compiler, &lhs, &lhs.int_type);
             fprintf(compiler->file, ", ");
-            compiler_codegen_data_name(compiler, &rhs);
+            compiler_codegen_data_name(compiler, &rhs, &lhs.int_type);
             fprintf(compiler->file, "\n");
             fprintf(compiler->file, "    setl al\n");
             fprintf(compiler->file, "    mov ");
-            compiler_codegen_data_name(compiler, &lhs);
-            fprintf(compiler->file, ", rax\n");
+            compiler_codegen_data_name(compiler, &lhs, &lhs.int_type);
+            fprintf(compiler->file, ", ");
+            compiler_codegen_data_name(compiler, &(AsmData) { .type = ASM_REGISTER, .asm_register = REGISTER_RAX }, &lhs.int_type);
+            fprintf(compiler->file, "\n");
 
             compiler_free_value(compiler, &rhs);
 
@@ -369,14 +401,16 @@ static AsmData compile_infix(Compiler *compiler, const ASTInfix *infix)
             compiler_rvalue(compiler, &rhs);
 
             fprintf(compiler->file, "    cmp ");
-            compiler_codegen_data_name(compiler, &lhs);
+            compiler_codegen_data_name(compiler, &lhs, &lhs.int_type);
             fprintf(compiler->file, ", ");
-            compiler_codegen_data_name(compiler, &rhs);
+            compiler_codegen_data_name(compiler, &rhs, &lhs.int_type);
             fprintf(compiler->file, "\n");
             fprintf(compiler->file, "    setge al\n");
             fprintf(compiler->file, "    mov ");
-            compiler_codegen_data_name(compiler, &lhs);
-            fprintf(compiler->file, ", rax\n");
+            compiler_codegen_data_name(compiler, &lhs, &lhs.int_type);
+            fprintf(compiler->file, ", ");
+            compiler_codegen_data_name(compiler, &(AsmData) { .type = ASM_REGISTER, .asm_register = REGISTER_RAX }, &lhs.int_type);
+            fprintf(compiler->file, "\n");
 
             compiler_free_value(compiler, &rhs);
 
@@ -391,14 +425,16 @@ static AsmData compile_infix(Compiler *compiler, const ASTInfix *infix)
             compiler_rvalue(compiler, &rhs);
 
             fprintf(compiler->file, "    cmp ");
-            compiler_codegen_data_name(compiler, &lhs);
+            compiler_codegen_data_name(compiler, &lhs, &lhs.int_type);
             fprintf(compiler->file, ", ");
-            compiler_codegen_data_name(compiler, &rhs);
+            compiler_codegen_data_name(compiler, &rhs, &lhs.int_type);
             fprintf(compiler->file, "\n");
             fprintf(compiler->file, "    setle al\n");
             fprintf(compiler->file, "    mov ");
-            compiler_codegen_data_name(compiler, &lhs);
-            fprintf(compiler->file, ", rax\n");
+            compiler_codegen_data_name(compiler, &lhs, &lhs.int_type);
+            fprintf(compiler->file, ", ");
+            compiler_codegen_data_name(compiler, &(AsmData) { .type = ASM_REGISTER, .asm_register = REGISTER_RAX }, &lhs.int_type);
+            fprintf(compiler->file, "\n");
 
             compiler_free_value(compiler, &rhs);
 
@@ -413,14 +449,16 @@ static AsmData compile_infix(Compiler *compiler, const ASTInfix *infix)
             compiler_rvalue(compiler, &rhs);
 
             fprintf(compiler->file, "    cmp ");
-            compiler_codegen_data_name(compiler, &lhs);
+            compiler_codegen_data_name(compiler, &lhs, &lhs.int_type);
             fprintf(compiler->file, ", ");
-            compiler_codegen_data_name(compiler, &rhs);
+            compiler_codegen_data_name(compiler, &rhs, &lhs.int_type);
             fprintf(compiler->file, "\n");
             fprintf(compiler->file, "    sete al\n");
             fprintf(compiler->file, "    mov ");
-            compiler_codegen_data_name(compiler, &lhs);
-            fprintf(compiler->file, ", rax\n");
+            compiler_codegen_data_name(compiler, &lhs, &lhs.int_type);
+            fprintf(compiler->file, ", ");
+            compiler_codegen_data_name(compiler, &(AsmData) { .type = ASM_REGISTER, .asm_register = REGISTER_RAX }, &lhs.int_type);
+            fprintf(compiler->file, "\n");
 
             compiler_free_value(compiler, &rhs);
 
@@ -434,16 +472,17 @@ static AsmData compile_infix(Compiler *compiler, const ASTInfix *infix)
             AsmData rhs = compile_ast(compiler, infix->rhs);
             compiler_rvalue(compiler, &rhs);
 
-
             fprintf(compiler->file, "    cmp ");
-            compiler_codegen_data_name(compiler, &lhs);
+            compiler_codegen_data_name(compiler, &lhs, &lhs.int_type);
             fprintf(compiler->file, ", ");
-            compiler_codegen_data_name(compiler, &rhs);
+            compiler_codegen_data_name(compiler, &rhs, &lhs.int_type);
             fprintf(compiler->file, "\n");
             fprintf(compiler->file, "    setne al\n");
             fprintf(compiler->file, "    mov ");
-            compiler_codegen_data_name(compiler, &lhs);
-            fprintf(compiler->file, ", rax\n");
+            compiler_codegen_data_name(compiler, &lhs, &lhs.int_type);
+            fprintf(compiler->file, ", ");
+            compiler_codegen_data_name(compiler, &(AsmData) { .type = ASM_REGISTER, .asm_register = REGISTER_RAX }, &lhs.int_type);
+            fprintf(compiler->file, "\n");
 
             compiler_free_value(compiler, &rhs);
 
@@ -478,19 +517,21 @@ static AsmData compile_prefix(Compiler *compiler, const ASTPrefix *prefix)
     switch (prefix->oper.type) {
         case TOKEN_OPER_SUB: {
             fprintf(compiler->file, "    neg ");
-            compiler_codegen_data_name(compiler, &node);
+            compiler_codegen_data_name(compiler, &node, NULL);
             fprintf(compiler->file, "\n");
             break;
         }
 
         case TOKEN_NOT: {
             fprintf(compiler->file, "    cmp ");
-            compiler_codegen_data_name(compiler, &node);
+            compiler_codegen_data_name(compiler, &node, NULL);
             fprintf(compiler->file, ", 0\n");
             fprintf(compiler->file, "    sete al\n");
             fprintf(compiler->file, "    mov ");
-            compiler_codegen_data_name(compiler, &node);
-            fprintf(compiler->file, ", rax\n");
+            compiler_codegen_data_name(compiler, &node, NULL);
+            fprintf(compiler->file, ", ");
+            compiler_codegen_data_name(compiler, &(AsmData) { .type = ASM_REGISTER, .asm_register = REGISTER_RAX }, &node.int_type);
+            fprintf(compiler->file, "\n");
             break;
         }
 
@@ -530,10 +571,16 @@ static AsmData compile_if_statement(Compiler *compiler, const ASTIfStatement *if
     AsmData condition = compile_ast(compiler, if_statement->condition);
     compiler_rvalue(compiler, &condition);
 
-    fprintf(compiler->file, "    mov rax, ");
-    compiler_codegen_data_name(compiler, &condition);
+    fprintf(compiler->file, "    mov ");
+    compiler_codegen_data_name(compiler, &(AsmData) { .type = ASM_REGISTER, .asm_register = REGISTER_RAX }, &condition.int_type);
+    fprintf(compiler->file, ", ");
+    compiler_codegen_data_name(compiler, &condition, NULL);
     fprintf(compiler->file, "\n");
-    fprintf(compiler->file, "    test rax, rax\n");
+    fprintf(compiler->file, "    test ");
+    compiler_codegen_data_name(compiler, &(AsmData) { .type = ASM_REGISTER, .asm_register = REGISTER_RAX }, &condition.int_type);
+    fprintf(compiler->file, ", ");
+    compiler_codegen_data_name(compiler, &(AsmData) { .type = ASM_REGISTER, .asm_register = REGISTER_RAX }, &condition.int_type);
+    fprintf(compiler->file, "\n");
     fprintf(compiler->file, "    jz .L%zu\n", if_label);
 
     compiler_free_value(compiler, &condition);
@@ -578,10 +625,16 @@ static AsmData compile_while_loop(Compiler *compiler, const ASTWhileLoop *while_
 
     AsmData condition = compile_ast(compiler, while_loop->condition);
 
-    fprintf(compiler->file, "    mov rax, ");
-    compiler_codegen_data_name(compiler, &condition);
+    fprintf(compiler->file, "    mov ");
+    compiler_codegen_data_name(compiler, &(AsmData) { .type = ASM_REGISTER, .asm_register = REGISTER_RAX }, &condition.int_type);
+    fprintf(compiler->file, ", ");
+    compiler_codegen_data_name(compiler, &condition, NULL);
     fprintf(compiler->file, "\n");
-    fprintf(compiler->file, "    test rax, rax\n");
+    fprintf(compiler->file, "    test ");
+    compiler_codegen_data_name(compiler, &(AsmData) { .type = ASM_REGISTER, .asm_register = REGISTER_RAX }, &condition.int_type);
+    fprintf(compiler->file, ", ");
+    compiler_codegen_data_name(compiler, &(AsmData) { .type = ASM_REGISTER, .asm_register = REGISTER_RAX }, &condition.int_type);
+    fprintf(compiler->file, "\n");
     fprintf(compiler->file, "    jz .L%zu\n", end_label);
 
     compiler_free_value(compiler, &condition);
@@ -651,6 +704,16 @@ AsmData compile_ast(Compiler *compiler, const AST *ast)
 
 void compile(const AST *ast, FILE *file)
 {
+    const AsmRegister registers[] = {
+        REGISTER_R11,
+        REGISTER_R10,
+        REGISTER_R9,
+        REGISTER_R8,
+        REGISTER_RSI,
+        REGISTER_RDI,
+        REGISTER_RCX
+    };
+
     Compiler compiler = {
         .file = file,
 
@@ -659,16 +722,8 @@ void compile(const AST *ast, FILE *file)
         .stack_register_pool_cap = 512,
 
         .label_count = 0,
-        .registers_len = REGISTER_TYPES,
-        .registers = {
-            REGISTER_R11,
-            REGISTER_R10,
-            REGISTER_R9,
-            REGISTER_R8,
-            REGISTER_RSI,
-            REGISTER_RDI,
-            REGISTER_RCX
-        },
+        .registers = (AsmRegister *) registers,
+        .registers_len = ARRAY_LEN(registers),
         .table = symbol_table_new(ast)
     };
 
@@ -690,8 +745,10 @@ void compile(const AST *ast, FILE *file)
 
     AsmData data = compile_ast(&compiler, ast);
 
-    fprintf(compiler.file, "    mov rax, ");
-    compiler_codegen_data_name(&compiler, &data);
+    fprintf(compiler.file, "    mov ");
+    compiler_codegen_data_name(&compiler, &(AsmData) { .type = ASM_REGISTER, .asm_register = REGISTER_RAX }, &data.int_type);
+    fprintf(compiler.file, ", ");
+    compiler_codegen_data_name(&compiler, &data, &data.int_type);
     fprintf(compiler.file, "\n");
     fprintf(
         compiler.file,

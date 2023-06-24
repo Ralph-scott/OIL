@@ -10,6 +10,7 @@
 - [ ] Arrays
 - [ ] Strings (Arrays of bytes)
 - [ ] Linux syscalls
+- [ ] Fix horrible codegen code
 - [ ] Functions
 - [ ] Data structures
 - [ ] Modules

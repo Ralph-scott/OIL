@@ -4,7 +4,7 @@ OBJECTS = $(patsubst src/%.c,build/%.o,$(FILES))
 
 WARN   = -Wall -Wextra
 OPT    ?= 0
-CFLAGS = -O$(OPT) $(WARN)
+CFLAGS = -g -O$(OPT) $(WARN)
 
 TARGET = build/$(shell basename $(shell pwd))
 
