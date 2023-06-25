@@ -1,4 +1,4 @@
-[Imgur](https://i.imgur.com/eN1nTjc.png)[Imgur](https://i.imgur.com/eN1nTjc.png)
+![oilogo](https://i.imgur.com/eN1nTjc.png)
 # OIL: Obvious Imperative Language
 ## Description
 
