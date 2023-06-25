@@ -1,7 +1,5 @@
-![oilogo](https://i.imgur.com/eN1nTjc.png)
+[<img align="right" height="100" src="oil-logo.png">](https://github.com/Ralph-scott/OIL/ "Logo.")
 # OIL: Obvious Imperative Language
-## Description
-
 OIL is an readable, imperative, statically typed C-like language,
 designed to be readable, and obvious in its syntax.
 
