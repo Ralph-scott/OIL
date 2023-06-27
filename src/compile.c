@@ -10,9 +10,9 @@
 
 AsmData compile_ast(Compiler *compiler, const AST *ast);
 
-static void compiler_codegen_data_name(Compiler *compiler, AsmData *data, DataTypeName *type)
+static void compiler_codegen_data_name(Compiler *compiler, AsmData *data, DataType *type)
 {
-    DataTypeName int_type = type && *type ? *type : data->int_type ? data->int_type : TYPE_INT32;
+    DataType int_type = type && *type ? *type : data->int_type ? data->int_type : TYPE_INT32;
 
     switch (data->type) {
         case ASM_REGISTER: {
@@ -54,10 +54,7 @@ static AsmData compiler_alloc_register(Compiler *compiler)
             };
         }
 
-        fprintf(
-            compiler->file,
-            "    sub rsp, 8\n"
-        );
+        fprintf(compiler->file, "    sub rsp, 8\n");
         return (AsmData) {
             .type = ASM_STACK_REGISTER,
             .stack_register = compiler->stack_registers_used++
@@ -265,7 +262,7 @@ AsmData compile_node(Compiler *compiler, const Token *token)
 
             return (AsmData) {
                 .type = ASM_VARIABLE,
-                .int_type = variable.type.type,
+                .int_type = variable.type,
                 .variable = variable
             };
         }

@@ -68,9 +68,13 @@ static void symbol_table_scan(SymbolTable *table, const AST *ast)
                 .name     = ast->declaration.name.text
             };
 
+            if (ast->declaration.type->type != TOKEN_IDENT) {
+                ERROR("Types can just be identifiers for now.");
+            }
+
             Variable variable = {
                 .id = table->variable_id++,
-                .type = data_type_name(ast->declaration.type)
+                .type = data_type_new(ast->declaration.type->node.text, ast->declaration.type->node.len)
             };
 
             hashmap_insert(&table->symbols, &variable_id, &variable);

@@ -5,6 +5,7 @@
 - [x] While loops
 - [x] Allocate variables on the stack, rather than static memory
 - [x] Types (different sizes of integers)
+- [ ] Store the type of every AST, generate them in the type-checking phase
 - [ ] Type checking
 - [ ] Pointers
 - [ ] Arrays

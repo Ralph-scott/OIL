@@ -33,6 +33,13 @@ typedef enum AsmRegister
     REGISTER_TYPES
 } AsmRegister;
 
+static const char *INT_TYPE_ASM[DATA_TYPES] = {
+    [TYPE_INT64] = "QWORD",
+    [TYPE_INT32] = "DWORD",
+    [TYPE_INT16] = "WORD",
+    [TYPE_INT8]  = "BYTE"
+};
+
 static const char *REGISTER_TO_STRING[REGISTER_TYPES][DATA_TYPES] = {
     [REGISTER_RAX] = {
         [TYPE_INT64] = "rax",
@@ -111,7 +118,7 @@ typedef struct AsmData
 {
     AsmDataType type;
 
-    DataTypeName int_type;
+    DataType int_type;
 
     union {
         AsmRegister asm_register;
