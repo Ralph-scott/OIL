@@ -266,7 +266,7 @@ static AsmData compile_node(Compiler *compiler, AST *node)
         }
 
         case TOKEN_NUMBER: {
-            AsmData asm_register = compiler_alloc_register(compiler, node->data_type == TYPE_NULL ? TYPE_INT32 : node->data_type);
+            AsmData asm_register = compiler_alloc_register(compiler, node->data_type);
 
             fprintf(compiler->file, "    mov ");
             compiler_codegen_data_name(compiler, &asm_register);
