@@ -30,6 +30,8 @@ typedef enum TokenType
     TOKEN_OPER_NOT_EQUALS,
     TOKEN_OPER_EQUALS,
 
+    TOKEN_REFERENCE,
+
     TOKEN_NOT,
 
     TOKEN_ASSIGN,

@@ -72,7 +72,11 @@ static void infer_type(AST *ast, DataType type)
     // TODO: Destroy this piece of code
     {
         // piece of code to destroy
-        ast->data_type = type;
+        if (type == TYPE_NULL) {
+            ast->data_type = TYPE_INT32;
+        } else {
+            ast->data_type = type;
+        }
     }
 }
 

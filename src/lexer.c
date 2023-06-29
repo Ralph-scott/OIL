@@ -77,11 +77,14 @@ Token lexer_next(Lexer *lexer)
                 break;
             }
 
+
             case '(': { type = TOKEN_LEFT_PAREN; ++lexer->pos; break; }
             case ')': { type = TOKEN_RIGHT_PAREN; ++lexer->pos; break; }
 
             case '{': { type = TOKEN_LEFT_CURLY; ++lexer->pos; break; }
             case '}': { type = TOKEN_RIGHT_CURLY; ++lexer->pos; break; }
+
+            case '@': { type = TOKEN_REFERENCE; ++lexer->pos; break; }
 
             case '+': { type = TOKEN_OPER_ADD; ++lexer->pos; break; }
             case '-': { type = TOKEN_OPER_SUB; ++lexer->pos; break; }
