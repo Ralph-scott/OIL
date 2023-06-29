@@ -2,6 +2,7 @@
 #define AST_H_
 
 #include "lexer.h"
+#include "types.h"
 
 typedef enum ASTType
 {
@@ -60,6 +61,7 @@ typedef struct ASTDeclaration
 typedef struct AST
 {
     ASTType type;
+    DataType data_type;
     union {
         Token node;
         ASTInfix infix;

@@ -1,7 +1,7 @@
-[<img align="right" height="100" src="oil-logo.png">](https://github.com/Ralph-scott/OIL/ "Logo.")
+[<img align="right" height="100" src="res/oil-logo.png">](https://github.com/Ralph-scott/OIL/ "Logo.")
 # OIL: Obvious Imperative Language
-OIL is an readable, imperative, statically typed C-like language,
-designed to be readable, and obvious in its syntax.
+OIL is a statically, strongly typed, imperative programming language that we designed
+because we were bored, and though it was a cool idea.
 
 ## Ideal Syntax (subject to change)
 ```rust

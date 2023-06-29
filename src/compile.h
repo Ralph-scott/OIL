@@ -3,7 +3,7 @@
 
 #include <stdio.h>
 #include "hashmap.h"
-#include "symbol_table.h"
+#include "type_checker.h"
 #include "parser.h"
 #include "types.h"
 
@@ -12,7 +12,7 @@ typedef enum AsmDataType
     ASM_REGISTER,
     ASM_STACK_REGISTER,
     ASM_VARIABLE,
-    ASM_VOID,
+    ASM_VOID
 } AsmDataType;
 
 typedef enum AsmRegister
@@ -144,6 +144,6 @@ typedef struct Compiler
     SymbolTable table;
 } Compiler;
 
-void compile(const AST *ast, FILE *file);
+void compile(AST *ast, FILE *file);
 
 #endif // COMPILE_H_

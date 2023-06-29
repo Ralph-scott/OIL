@@ -3,7 +3,7 @@
 #include <string.h>
 #include <stdint.h>
 #include <stdbool.h>
-#include "symbol_table.h"
+#include "type_checker.h"
 #include "hashmap.h"
 #include "types.h"
 #include "utils.h"
@@ -25,39 +25,156 @@ static bool variable_id_equals(const void *_lhs, const void *_rhs)
         && strncmp(lhs->name, rhs->name, lhs->name_len) == 0;
 }
 
-static void symbol_table_scan(SymbolTable *table, const AST *ast)
+static void infer_type(AST *ast, DataType type)
+{
+    if (ast->data_type != TYPE_NULL) {
+        if (type != TYPE_NULL && ast->data_type != type) {
+            ERROR("Data types are not the same.");
+        }
+        return;
+    }
+
+    switch (ast->type) {
+        case AST_NODE: {
+            break;
+        }
+
+        case AST_PREFIX: {
+            infer_type(ast->prefix.node, type);
+            break;
+        }
+
+        case AST_INFIX: {
+            infer_type(ast->infix.lhs, type);
+            infer_type(ast->infix.rhs, type);
+            break;
+        }
+
+        case AST_BLOCK: {
+            if (ast->block.len > 0) {
+                infer_type(ast->block.statements[ast->block.len - 1], type);
+            }
+            break;
+        }
+
+        case AST_IF_STATEMENT: {
+            infer_type(ast->if_statement.if_branch, type);
+            if (ast->if_statement.else_branch != NULL) {
+                infer_type(ast->if_statement.else_branch, type);
+            }
+            break;
+        }
+
+        default: {
+            break;
+        }
+    }
+    // TODO: Destroy this piece of code
+    {
+        // piece of code to destroy
+        ast->data_type = type;
+    }
+}
+
+static void symbol_table_scan(SymbolTable *table, AST *ast)
 {
     switch (ast->type) {
         case AST_NODE: {
-            if (ast->node.type == TOKEN_IDENT) {
-                symbol_table_variable(table, ast->node.text, ast->node.len);
+            switch (ast->node.type) {
+                case TOKEN_IDENT: {
+                    Variable variable = symbol_table_variable(table, ast->node.text, ast->node.len);
+                    ast->data_type = variable.data_type;
+                    break;
+                }
+
+                case TOKEN_NUMBER: {
+                    break;
+                }
+
+                default: {
+                    break;
+                }
             }
             break;
         }
 
         case AST_PREFIX: {
             symbol_table_scan(table, ast->prefix.node);
+            infer_type(ast->prefix.node, TYPE_NULL);
+
+            switch (ast->infix.oper.type) {
+                case TOKEN_OPER_SUB: {
+                    ast->data_type = ast->prefix.node->data_type;
+                    break;
+                }
+
+                case TOKEN_NOT: {
+                    // TODO: add booleans
+                    // ast->data_type = TYPE_BOOL
+                    ast->data_type = ast->prefix.node->data_type;
+                    break;
+                }
+
+                default: {
+                    break;
+                }
+            }
+
+            ast->data_type = ast->prefix.node->data_type;
             break;
         }
 
         case AST_INFIX: {
             symbol_table_scan(table, ast->infix.lhs);
             symbol_table_scan(table, ast->infix.rhs);
+            infer_type(ast->infix.lhs, ast->infix.rhs->data_type);
+            infer_type(ast->infix.rhs, ast->infix.lhs->data_type);
+
+            ast->data_type = ast->infix.lhs->data_type;
             break;
         }
 
         case AST_BLOCK: {
+            DataType type = TYPE_NULL;
             symbol_table_begin_scope(table);
             for (size_t i = 0; i < ast->block.len; ++i) {
                 symbol_table_scan(table, ast->block.statements[i]);
+                infer_type(ast->block.statements[i], TYPE_NULL);
+                type = ast->block.statements[i]->data_type;
             }
             symbol_table_end_scope(table);
+            ast->data_type = type;
             break;
         }
 
         case AST_IF_STATEMENT: {
             symbol_table_scan(table, ast->if_statement.condition);
+
+            DataType if_statement_type =
+                ast->if_statement.else_branch == NULL
+                ? TYPE_NULL
+                : ast->if_statement.else_branch->data_type;
+
             symbol_table_scan(table, ast->if_statement.if_branch);
+
+            infer_type(ast->if_statement.condition, TYPE_NULL);
+
+            if (ast->if_statement.else_branch != NULL) {
+                symbol_table_scan(table, ast->if_statement.else_branch);
+                infer_type(ast->if_statement.else_branch, ast->if_statement.if_branch->data_type);
+            }
+
+            infer_type(ast->if_statement.if_branch, if_statement_type);
+
+            ast->data_type = ast->if_statement.if_branch->data_type;
+            break;
+        }
+
+        case AST_WHILE_LOOP: {
+            symbol_table_scan(table, ast->while_loop.condition);
+            symbol_table_scan(table, ast->while_loop.body);
+            infer_type(ast->while_loop.condition, TYPE_NULL);
+            infer_type(ast->while_loop.body, TYPE_NULL);
             break;
         }
 
@@ -74,13 +191,14 @@ static void symbol_table_scan(SymbolTable *table, const AST *ast)
 
             Variable variable = {
                 .id = table->variable_id++,
-                .type = data_type_new(ast->declaration.type->node.text, ast->declaration.type->node.len)
+                .data_type = data_type_new(ast->declaration.type->node.text, ast->declaration.type->node.len)
             };
 
             hashmap_insert(&table->symbols, &variable_id, &variable);
 
             if (ast->declaration.value != NULL) {
                 symbol_table_scan(table, ast->declaration.value);
+                infer_type(ast->declaration.value, variable.data_type);
             }
 
             break;
@@ -92,7 +210,7 @@ static void symbol_table_scan(SymbolTable *table, const AST *ast)
     }
 }
 
-SymbolTable symbol_table_new(const AST *ast)
+SymbolTable symbol_table_new(AST *ast)
 {
     SymbolTable table = {
         .symbols = hashmap_new(

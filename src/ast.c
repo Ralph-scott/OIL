@@ -11,6 +11,8 @@ AST *ast_alloc(void)
         ALLOCATION_ERROR();
     }
 
+    ast->data_type = TYPE_NULL;
+
     return ast;
 }
 

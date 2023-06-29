@@ -17,7 +17,7 @@ typedef struct VariableID
 typedef struct Variable
 {
     size_t id;
-    DataType type;
+    DataType data_type;
 } Variable;
 
 typedef struct SymbolTable
@@ -33,7 +33,7 @@ typedef struct SymbolTable
     size_t *scopes;
 } SymbolTable;
 
-SymbolTable symbol_table_new(const AST *ast);
+SymbolTable symbol_table_new(AST *ast);
 
 Variable symbol_table_variable(SymbolTable *table, const char *name, const size_t name_len);
 
