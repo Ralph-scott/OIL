@@ -6,8 +6,10 @@
 #include "lexer.h"
 
 static const bool IS_PREFIX[TOKEN_TYPES] = {
-    [TOKEN_OPER_SUB] = true,
-    [TOKEN_NOT]      = true,
+    [TOKEN_OPER_SUB]  = true,
+    [TOKEN_NOT]       = true,
+    [TOKEN_REFERENCE] = true,
+    [TOKEN_DEREFERENCE] = true
 };
 
 static const bool IS_NODE[TOKEN_TYPES] = {

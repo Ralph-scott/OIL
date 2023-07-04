@@ -307,13 +307,10 @@ AST *parse_statements(Lexer *lexer)
             }
         }
 
-        Token token = lexer_peek(lexer);
-
+        Token token = lexer_next(lexer);
         if (token.type != TOKEN_SEMICOLON) {
-            break;
+            UNEXPECTED_TOKEN(token);
         }
-
-        lexer_next(lexer);
     }
 
     return ast;

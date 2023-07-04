@@ -17,7 +17,7 @@ typedef struct VariableID
 typedef struct Variable
 {
     size_t id;
-    DataType data_type;
+    DataType *data_type;
 } Variable;
 
 typedef struct SymbolTable

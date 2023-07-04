@@ -11,7 +11,7 @@ AST *ast_alloc(void)
         ALLOCATION_ERROR();
     }
 
-    ast->data_type = TYPE_NULL;
+    ast->data_type = data_type_type(TYPE_NULL);
 
     return ast;
 }
@@ -132,6 +132,8 @@ void ast_free(AST *ast)
             break;
         }
     }
+
+    data_type_free(ast->data_type);
 
     free(ast);
 }

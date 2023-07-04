@@ -52,6 +52,9 @@ int main(int argc, char **argv)
 
     AST *ast = parse(&lexer);
 
+    //ast_print(ast);
+    //printf("\n");
+
     FILE *file = fopen(path, "w");
 
     compile(ast, file);

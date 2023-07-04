@@ -1,12 +1,15 @@
-CC      = clang
-FILES   = $(wildcard src/**.c)
-OBJECTS = $(patsubst src/%.c,build/%.o,$(FILES))
+CC      := clang
+FILES   := $(wildcard src/**.c)
+OBJECTS := $(patsubst src/%.c,build/%.o,$(FILES))
+TARGET  := build/$(shell basename $(shell pwd))
 
-WARN   = -Wall -Wextra
+WARN   := -Wall -Wextra
 OPT    ?= 0
-CFLAGS = -O$(OPT) $(WARN)
+CFLAGS := -O$(OPT) $(WARN)
 
-TARGET = build/$(shell basename $(shell pwd))
+ifeq ($(DEBUG), true)
+CFLAGS += -g
+endif
 
 .PHONY: all clean
 all: $(TARGET)
@@ -19,5 +22,5 @@ build/%.o: src/%.c
 	mkdir -p build
 	$(CC) -c $(CFLAGS) -o $@ $^
 
-clean:
-	rm -r build
+clean: $(OBJECTS) $(TARGET)
+	rm -r $(OBJECTS) $(TARGET)
