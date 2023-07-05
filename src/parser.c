@@ -281,7 +281,7 @@ AST *parse_statements(Lexer *lexer)
         .cap        = 256,
     };
 
-    ast->block.statements = malloc(sizeof(AST *) * ast->block.cap);
+    ast->block.statements = malloc(sizeof(*ast->block.statements) * ast->block.cap);
 
     if (ast->block.statements == NULL) {
         ALLOCATION_ERROR();
@@ -300,7 +300,7 @@ AST *parse_statements(Lexer *lexer)
             while (ast->block.len >= ast->block.cap) {
                 ast->block.cap *= 2;
             }
-            ast->block.statements = realloc(ast->block.statements, sizeof(AST *) * ast->block.cap);
+            ast->block.statements = realloc(ast->block.statements, sizeof(*ast->block.statements) * ast->block.cap);
 
             if (ast->block.statements == NULL) {
                 ALLOCATION_ERROR();

@@ -27,6 +27,9 @@ AsmContext asm_context_new(FILE *file)
     AsmContext context = {
         .file = file,
 
+        .data_section_len = 0,
+        .data_section_cap = 512,
+
         .stack_frame_size        = 0,
         .stack_register_pool_len = 0,
         .stack_register_pool_cap = 512,
@@ -35,7 +38,13 @@ AsmContext asm_context_new(FILE *file)
         .registers_len = ARRAY_LEN(usable_registers)
     };
 
-    context.stack_register_pool = malloc(sizeof(size_t) * context.stack_register_pool_cap);
+    context.data_section = malloc(sizeof(*context.data_section) * context.data_section_cap);
+
+    if (context.data_section == NULL) {
+        ALLOCATION_ERROR();
+    }
+
+    context.stack_register_pool = malloc(sizeof(*context.stack_register_pool) * context.stack_register_pool_cap);
 
     if (context.stack_register_pool == NULL) {
         ALLOCATION_ERROR();
@@ -58,6 +67,36 @@ AsmContext asm_context_new(FILE *file)
     );
 
     return context;
+}
+
+AsmData asm_context_add_to_data_section(AsmContext *context, char *data, size_t data_len, DataType *data_type)
+{
+    if (context->data_section_len >= context->data_section_cap) {
+        while (context->data_section_len >= context->data_section_cap) {
+            context->data_section_cap *= 2;
+        }
+
+        context->data_section = realloc(
+            context->data_section,
+            sizeof(*context->data_section) * context->data_section_cap
+        );
+
+        if (context->data_section == NULL) {
+            ALLOCATION_ERROR();
+        }
+    }
+
+    context->data_section[context->data_section_len] = (DataSectionThing) {
+        .data_len = data_len,
+        .data = data
+    };
+
+    return (AsmData) {
+        .auto_deref = data_type->type != TYPE_REFERENCE,
+        .storage = STORAGE_STATIC,
+        .data_type = data_type,
+        .static_variable_id = context->data_section_len++
+    };
 }
 
 size_t asm_context_label_new(AsmContext *context)
@@ -86,6 +125,43 @@ AsmData asm_context_data_alloc(AsmContext *context, DataType *data_type)
     return asm_data_stack(context->stack_frame_size, data_type);
 }
 
+void asm_context_data_name(AsmContext *context, AsmData data)
+{
+    if (data.auto_deref) {
+        fprintf(context->file, "%s [", INT_TYPE_ASM[data.data_type->type]);
+    }
+
+    switch (data.storage) {
+        case STORAGE_NULL: {
+            UNREACHABLE();
+            break;
+        }
+
+        case STORAGE_STATIC: {
+            fprintf(context->file, "D%zu", data.static_variable_id);
+            break;
+        }
+
+        case STORAGE_REGISTER: {
+            fprintf(context->file, "%s", REGISTER_TO_STRING[data.asm_register][data.data_type->type]);
+            break;
+        }
+
+        case STORAGE_STACK: {
+            if (data.auto_deref) {
+                UNREACHABLE();
+            }
+
+            fprintf(context->file, "%s [rsp + %zu]", INT_TYPE_ASM[data.data_type->type], context->stack_frame_size - data.stack_location);
+            break;
+        }
+    }
+
+    if (data.auto_deref) {
+        fprintf(context->file, "]");
+    }
+}
+
 void asm_context_data_free(AsmContext *context, AsmData data)
 {
     switch (data.storage) {
@@ -105,7 +181,7 @@ void asm_context_data_free(AsmContext *context, AsmData data)
 
                 context->stack_register_pool = realloc(
                     context->stack_register_pool,
-                    sizeof(size_t) * context->stack_register_pool_cap
+                    sizeof(*context->stack_register_pool) * context->stack_register_pool_cap
                 );
 
                 if (context->stack_register_pool == NULL) {
@@ -120,36 +196,6 @@ void asm_context_data_free(AsmContext *context, AsmData data)
         default: {
             break;
         }
-    }
-}
-
-void asm_context_data_name(AsmContext *context, AsmData data)
-{
-    if (data.auto_deref) {
-        fprintf(context->file, "%s [", INT_TYPE_ASM[data.data_type->type]);
-    }
-    switch (data.storage) {
-        case STORAGE_NULL: {
-            UNREACHABLE();
-            break;
-        }
-
-        case STORAGE_REGISTER: {
-            fprintf(context->file, "%s", REGISTER_TO_STRING[data.asm_register][data.data_type->type]);
-            break;
-        }
-
-        case STORAGE_STACK: {
-            if (data.auto_deref) {
-                UNREACHABLE();
-            }
-
-            fprintf(context->file, "%s [rsp + %zu]", INT_TYPE_ASM[data.data_type->type], context->stack_frame_size - data.stack_location);
-            break;
-        }
-    }
-    if (data.auto_deref) {
-        fprintf(context->file, "]");
     }
 }
 
@@ -225,7 +271,7 @@ void asm_context_mul(AsmContext *context, AsmData dst, AsmData src)
 {
     asm_context_mov(context, asm_data_register(REGISTER_RAX, dst.data_type), dst);
 
-    fprintf(context->file, "    imul ");
+    fprintf(context->file, "    mul ");
     asm_context_data_name(context, src);
     fprintf(context->file, "\n");
 
@@ -236,7 +282,7 @@ void asm_context_div(AsmContext *context, AsmData dst, AsmData src)
 {
     asm_context_mov(context, asm_data_register(REGISTER_RAX, dst.data_type), dst);
 
-    fprintf(context->file, "    idiv ");
+    fprintf(context->file, "    div ");
     asm_context_data_name(context, src);
     fprintf(context->file, "\n");
 
@@ -395,13 +441,29 @@ void asm_context_free(AsmContext *context)
 {
     fprintf(
         context->file,
-        "    sub rsp, %zu\n"
+        "    add rsp, %zu\n"
         "exit:\n"
         "    mov rdi, rax\n"
         "    mov rax, 60\n"
-        "    syscall\n",
+        "    syscall\n"
+        "section .data\n",
         context->stack_frame_size
     );
 
+    for (size_t i = 0; i < context->data_section_len; ++i) {
+        fprintf(context->file, "D%zu: db ", i);
+        DataSectionThing thing = context->data_section[i];
+        for (size_t j = 0; j < thing.data_len; ++j) {
+            fprintf(context->file, "0x%02x", thing.data[j]);
+            if (j + 1 < thing.data_len) {
+                fprintf(context->file, ", ");
+            }
+        }
+        fprintf(context->file, "\n");
+        free(thing.data);
+    }
+
+    free(context->data_section);
+    free(context->stack_register_pool);
     free(context->registers);
 }

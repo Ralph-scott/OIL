@@ -28,13 +28,13 @@ HashMap hashmap_new(HashFn hash_fn, EqualsFn equals_fn, const size_t key_size, c
     };
 
     // clear the memory (init to NULL)
-    hashmap.buckets = malloc(sizeof(HashMapEntry *) * HASHMAP_SIZE);
+    hashmap.buckets = malloc(sizeof(*hashmap.buckets) * HASHMAP_SIZE);
 
     if (hashmap.buckets == NULL) {
         ALLOCATION_ERROR();
     }
 
-    memset(hashmap.buckets, 0, sizeof(HashMapEntry *) * HASHMAP_SIZE);
+    memset(hashmap.buckets, 0, sizeof(*hashmap.buckets) * HASHMAP_SIZE);
 
     return hashmap;
 }

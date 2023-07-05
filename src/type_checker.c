@@ -123,6 +123,12 @@ static void symbol_table_scan(SymbolTable *table, AST *ast)
                     break;
                 }
 
+                case TOKEN_STRING: {
+                    data_type_free(ast->data_type);
+                    ast->data_type = data_type_reference(data_type_type(TYPE_INT8));
+                    break;
+                }
+
                 case TOKEN_NUMBER: {
                     break;
                 }
@@ -261,7 +267,7 @@ SymbolTable symbol_table_new(AST *ast)
         .scopes_cap   = 16
     };
 
-    table.scopes = malloc(sizeof(size_t) * table.scopes_cap);
+    table.scopes = malloc(sizeof(*table.scopes) * table.scopes_cap);
 
     if (table.scopes == NULL) {
         ALLOCATION_ERROR();
@@ -306,7 +312,7 @@ void symbol_table_begin_scope(SymbolTable *table)
             table->scopes_cap *= 2;
         }
 
-        table->scopes = realloc(table->scopes, sizeof(size_t) * table->scopes_cap);
+        table->scopes = realloc(table->scopes, sizeof(*table->scopes) * table->scopes_cap);
 
         if (table->scopes == NULL) {
             ALLOCATION_ERROR();

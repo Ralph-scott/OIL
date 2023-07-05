@@ -8,6 +8,8 @@ typedef enum TokenType
     TOKEN_IDENT,
     TOKEN_NUMBER,
 
+    TOKEN_STRING,
+
     TOKEN_IF,
     TOKEN_ELSE,
 

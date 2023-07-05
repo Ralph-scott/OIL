@@ -9,22 +9,66 @@
 #include "types.h"
 #include "utils.h"
 
+static char *string_literal_to_string(char *text, size_t text_len)
+{
+    size_t out_text_len = 0;
+    char *out_text = malloc(sizeof(*out_text) * (text_len + 1));
+
+    if (out_text == NULL) {
+        ALLOCATION_ERROR();
+    }
+
+    for (size_t i = 1; i < text_len - 1; ++i) {
+        if (text[i] != '\\') {
+            out_text[out_text_len++] = text[i];
+            continue;
+        }
+
+        ++i;
+        switch (text[i]) {
+            case 'r': {
+                out_text[out_text_len++] = '\r';
+                break;
+            }
+
+            case 'n': {
+                out_text[out_text_len++] = '\n';
+                break;
+            }
+
+            case 't': {
+                out_text[out_text_len++] = '\t';
+                break;
+            }
+
+            default: {
+                out_text[out_text_len++] = text[i];
+                break;
+            }
+        }
+    }
+
+    out_text[out_text_len] = '\0';
+
+    return out_text;
+}
+
 AsmData compile_ast(Compiler *compiler, AST *ast);
 
-static AsmData compile_node(Compiler *compiler, AST *node)
+static AsmData compile_node(Compiler *compiler, AST *ast)
 {
-    switch (node->node.type) {
+    switch (ast->node.type) {
         case TOKEN_IDENT: {
-            Variable variable = symbol_table_variable(&compiler->table, node->node.text, node->node.len);
+            Variable variable = symbol_table_variable(&compiler->table, ast->node.text, ast->node.len);
 
             return asm_data_stack(variable.id * 8, variable.data_type);
         }
 
         case TOKEN_NUMBER: {
-            AsmData asm_register = asm_context_data_alloc(&compiler->asm_context, node->data_type);
+            AsmData asm_register = asm_context_data_alloc(&compiler->asm_context, ast->data_type);
 
             size_t num;
-            if (sscanf(node->node.text, "%zu", &num) == -1) {
+            if (sscanf(ast->node.text, "%zu", &num) == -1) {
                 ERROR("Could not parse integer.");
             }
 
@@ -33,20 +77,25 @@ static AsmData compile_node(Compiler *compiler, AST *node)
             return asm_register;
         }
 
+        case TOKEN_STRING: {
+            char *literal = string_literal_to_string(ast->node.text, ast->node.len);
+            return asm_context_add_to_data_section(&compiler->asm_context, literal, strlen(literal), ast->data_type);
+        }
+
         default: {
             UNREACHABLE();
         }
     }
 }
 
-static AsmData compile_infix(Compiler *compiler, AST *infix)
+static AsmData compile_infix(Compiler *compiler, AST *ast)
 {
-    AsmData lhs = compile_ast(compiler, infix->infix.lhs);
-    AsmData rhs = compile_ast(compiler, infix->infix.rhs);
+    AsmData lhs = compile_ast(compiler, ast->infix.lhs);
+    AsmData rhs = compile_ast(compiler, ast->infix.rhs);
 
     AsmData result = asm_context_data_alloc(&compiler->asm_context, lhs.data_type);
 
-    switch (infix->infix.oper.type) {
+    switch (ast->infix.oper.type) {
         case TOKEN_OPER_ADD: {
             asm_context_mov(&compiler->asm_context, result, lhs);
             asm_context_add(&compiler->asm_context, result, rhs);
@@ -217,7 +266,6 @@ static AsmData compile_if_statement(Compiler *compiler, AST *ast)
     asm_context_label(&compiler->asm_context, end_label);
 
     asm_context_data_free(&compiler->asm_context, if_block);
-    asm_context_data_free(&compiler->asm_context, condition);
 
     return result;
 }

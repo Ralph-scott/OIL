@@ -14,7 +14,8 @@ static const bool IS_PREFIX[TOKEN_TYPES] = {
 
 static const bool IS_NODE[TOKEN_TYPES] = {
     [TOKEN_IDENT]  = true,
-    [TOKEN_NUMBER] = true
+    [TOKEN_NUMBER] = true,
+    [TOKEN_STRING] = true
 };
 
 static const bool IS_END[TOKEN_TYPES] = {

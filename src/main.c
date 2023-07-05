@@ -22,7 +22,7 @@ char *read_file(const char *path)
     const size_t size = ftell(f);
     fseek(f, 0, SEEK_SET);
 
-    char *text = malloc(sizeof(char) * (size + 1));
+    char *text = malloc(sizeof(*text) * (size + 1));
     
     if (text == NULL) {
         ALLOCATION_ERROR();

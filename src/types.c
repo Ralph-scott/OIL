@@ -41,6 +41,8 @@ DataType *data_type_new(const AST *ast)
                     return data_type_type(TYPE_INT64);
                 } else if (strncmp(ast->node.text, "void", ast->node.len) == 0) {
                     return data_type_type(TYPE_VOID);
+                } else if (strncmp(ast->node.text, "string", ast->node.len) == 0) {
+                    return data_type_reference(data_type_type(TYPE_INT8));
                 }
             }
             break;

@@ -2,9 +2,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdbool.h>
-
-#include "utils.h"
 #include "lexer.h"
+#include "utils.h"
 
 static inline bool is_ident(char ch)
 {
@@ -45,6 +44,25 @@ Token lexer_next(Lexer *lexer)
         switch (lexer->text[lexer->pos]) {
             case '\0': {
                 type = TOKEN_EOF;
+                break;
+            }
+
+            case '"': {
+                type = TOKEN_STRING;
+                ++lexer->pos;
+                while (lexer->text[lexer->pos] != '"') {
+                    if (lexer->text[lexer->pos] == '\0') {
+                        ERROR("String literal not closed off.");
+                    }
+                    if (lexer->text[lexer->pos] == '\\') {
+                        ++lexer->pos;
+                        if (lexer->text[lexer->pos] == '\0') {
+                            ERROR("Cannot escape an EOF.");
+                        }
+                    }
+                    ++lexer->pos;
+                }
+                ++lexer->pos;
                 break;
             }
 

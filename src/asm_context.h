@@ -8,6 +8,7 @@ typedef enum AsmStorageType
 {
     STORAGE_NULL,
 
+    STORAGE_STATIC,
     STORAGE_REGISTER,
     STORAGE_STACK
 } AsmStorageType;
@@ -146,15 +147,26 @@ typedef struct AsmData
     union {
         AsmRegister asm_register;
         size_t stack_location;
+        size_t static_variable_id;
     };
 } AsmData;
 
 AsmData asm_data_register(AsmRegister asm_register, DataType *data_type);
 AsmData asm_data_stack(size_t stack_location, DataType *data_type);
 
+typedef struct DataSectionThing
+{
+    size_t data_len;
+    char *data;
+} DataSectionThing;
+
 typedef struct AsmContext
 {
     FILE *file;
+
+    size_t data_section_len;
+    size_t data_section_cap;
+    DataSectionThing *data_section;
 
     size_t label_count;
 
@@ -169,13 +181,14 @@ typedef struct AsmContext
 
 AsmContext asm_context_new(FILE *file);
 
+AsmData asm_context_add_to_data_section(AsmContext *context, char *data, size_t data_len, DataType *data_type);
+
 size_t asm_context_label_new(AsmContext *context);
 
 void asm_context_extend_stack(AsmContext *context, size_t bytes);
 
-void asm_context_data_name(AsmContext *context, AsmData data);
-
 AsmData asm_context_data_alloc(AsmContext *context, DataType *data_type);
+void asm_context_data_name(AsmContext *context, AsmData data);
 void asm_context_data_free(AsmContext *context, AsmData data);
 
 void asm_context_mov(AsmContext *context, AsmData dst, AsmData src);
