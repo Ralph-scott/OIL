@@ -1,6 +1,7 @@
 #ifndef AST_H_
 #define AST_H_
 
+#include <stdio.h>
 #include "lexer.h"
 #include "types.h"
 
@@ -12,10 +13,10 @@ typedef enum ASTType
     AST_BLOCK,
     AST_IF_STATEMENT,
     AST_WHILE_LOOP,
+    AST_FUNCTION_CALL,
     AST_DECLARATION
 } ASTType;
 
-struct AST;
 typedef struct AST AST;
 
 typedef struct ASTInfix
@@ -51,6 +52,14 @@ typedef struct ASTWhileLoop
     AST *body;
 } ASTWhileLoop;
 
+typedef struct ASTFunctionCall
+{
+    AST *lhs;
+    size_t len;
+    size_t cap;
+    AST **arguments;
+} ASTFunctionCall;
+
 typedef struct ASTDeclaration
 {
     Token name;
@@ -69,12 +78,13 @@ typedef struct AST
         ASTBlock block;
         ASTIfStatement if_statement;
         ASTWhileLoop while_loop;
+        ASTFunctionCall function_call;
         ASTDeclaration declaration;
     };
 } AST;
 
 AST *ast_alloc(void);
-void ast_print(const AST *ast);
+void ast_print(FILE *file, const AST *ast);
 void ast_free(AST *ast);
 
 #endif // AST_H_

@@ -8,8 +8,8 @@
 
 #define ARRAY_LEN(_arr) (sizeof((_arr)) / sizeof(*(_arr)))
 
-#define RED   "\x1B[31m"
-#define RESET "\x1B[0m"
+#define RED   "\x1b[31m"
+#define RESET "\x1b[0m"
 
 #define ERROR(_msg, ...)                   \
     do {                                   \

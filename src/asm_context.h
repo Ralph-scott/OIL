@@ -3,6 +3,7 @@
 
 #include <stdio.h>
 #include "types.h"
+#include "type_checker.h"
 
 typedef enum AsmStorageType
 {
@@ -10,7 +11,9 @@ typedef enum AsmStorageType
 
     STORAGE_STATIC,
     STORAGE_REGISTER,
-    STORAGE_STACK
+    STORAGE_STACK,
+    STORAGE_STACK_VARIABLE,
+    STORAGE_FUNCTION
 } AsmStorageType;
 
 typedef enum AsmRegister
@@ -53,6 +56,7 @@ static const char *REGISTER_TO_STRING[REGISTER_TYPES][DATA_TYPES] = {
     [REGISTER_RAX] = {
         [TYPE_INT64]     = "rax",
         [TYPE_REFERENCE] = "rax",
+        [TYPE_FUNCTION]  = "rax",
         [TYPE_INT32]     = "eax",
         [TYPE_INT16]     = "ax",
         [TYPE_INT8]      = "al",
@@ -60,6 +64,7 @@ static const char *REGISTER_TO_STRING[REGISTER_TYPES][DATA_TYPES] = {
     [REGISTER_RBX] = {
         [TYPE_INT64]     = "rbx",
         [TYPE_REFERENCE] = "rbx",
+        [TYPE_FUNCTION]  = "rbx",
         [TYPE_INT32]     = "ebx",
         [TYPE_INT16]     = "bx",
         [TYPE_INT8]      = "bl",
@@ -67,6 +72,7 @@ static const char *REGISTER_TO_STRING[REGISTER_TYPES][DATA_TYPES] = {
     [REGISTER_RCX] = {
         [TYPE_INT64]     = "rcx",
         [TYPE_REFERENCE] = "rcx",
+        [TYPE_FUNCTION]  = "rcx",
         [TYPE_INT32]     = "ecx",
         [TYPE_INT16]     = "cx",
         [TYPE_INT8]      = "cl",
@@ -74,6 +80,7 @@ static const char *REGISTER_TO_STRING[REGISTER_TYPES][DATA_TYPES] = {
     [REGISTER_RDX] = {
         [TYPE_INT64]     = "rdx",
         [TYPE_REFERENCE] = "rdx",
+        [TYPE_FUNCTION]  = "rdx",
         [TYPE_INT32]     = "edx",
         [TYPE_INT16]     = "dx",
         [TYPE_INT8]      = "dl",
@@ -81,6 +88,7 @@ static const char *REGISTER_TO_STRING[REGISTER_TYPES][DATA_TYPES] = {
     [REGISTER_RSI] = {
         [TYPE_INT64]     = "rsi",
         [TYPE_REFERENCE] = "rsi",
+        [TYPE_FUNCTION]  = "rsi",
         [TYPE_INT32]     = "esi",
         [TYPE_INT16]     = "si",
         [TYPE_INT8]      = "sil",
@@ -88,6 +96,7 @@ static const char *REGISTER_TO_STRING[REGISTER_TYPES][DATA_TYPES] = {
     [REGISTER_RDI] = {
         [TYPE_INT64]     = "rdi",
         [TYPE_REFERENCE] = "rdi",
+        [TYPE_FUNCTION]  = "rdi",
         [TYPE_INT32]     = "edi",
         [TYPE_INT16]     = "di",
         [TYPE_INT8]      = "dil",
@@ -95,6 +104,7 @@ static const char *REGISTER_TO_STRING[REGISTER_TYPES][DATA_TYPES] = {
     [REGISTER_R8] = {
         [TYPE_INT64]     = "r8",
         [TYPE_REFERENCE] = "r8",
+        [TYPE_FUNCTION]  = "r8",
         [TYPE_INT32]     = "r8d",
         [TYPE_INT16]     = "r8w",
         [TYPE_INT8]      = "r8b",
@@ -102,6 +112,7 @@ static const char *REGISTER_TO_STRING[REGISTER_TYPES][DATA_TYPES] = {
     [REGISTER_R9] = {
         [TYPE_INT64]     = "r9",
         [TYPE_REFERENCE] = "r9",
+        [TYPE_FUNCTION]  = "r9",
         [TYPE_INT32]     = "r9d",
         [TYPE_INT16]     = "r9w",
         [TYPE_INT8]      = "r9b",
@@ -109,6 +120,7 @@ static const char *REGISTER_TO_STRING[REGISTER_TYPES][DATA_TYPES] = {
     [REGISTER_R10] = {
         [TYPE_INT64]     = "r10",
         [TYPE_REFERENCE] = "r10",
+        [TYPE_FUNCTION]  = "r10",
         [TYPE_INT32]     = "r10d",
         [TYPE_INT16]     = "r10w",
         [TYPE_INT8]      = "r10b",
@@ -116,6 +128,7 @@ static const char *REGISTER_TO_STRING[REGISTER_TYPES][DATA_TYPES] = {
     [REGISTER_R11] = {
         [TYPE_INT64]     = "r11",
         [TYPE_REFERENCE] = "r11",
+        [TYPE_FUNCTION]  = "r11",
         [TYPE_INT32]     = "r11d",
         [TYPE_INT16]     = "r11w",
         [TYPE_INT8]      = "r11b",
@@ -123,6 +136,7 @@ static const char *REGISTER_TO_STRING[REGISTER_TYPES][DATA_TYPES] = {
     [REGISTER_RSP] = {
         [TYPE_INT64]     = "rsp",
         [TYPE_REFERENCE] = "rsp",
+        [TYPE_FUNCTION]  = "rsp",
         [TYPE_INT32]     = "esp",
         [TYPE_INT16]     = "sp",
         [TYPE_INT8]      = "spl",
@@ -130,6 +144,7 @@ static const char *REGISTER_TO_STRING[REGISTER_TYPES][DATA_TYPES] = {
     [REGISTER_RBP] = {
         [TYPE_INT64]     = "rbp",
         [TYPE_REFERENCE] = "rbp",
+        [TYPE_FUNCTION]  = "rbp",
         [TYPE_INT32]     = "ebp",
         [TYPE_INT16]     = "bp",
         [TYPE_INT8]      = "bpl",
@@ -145,14 +160,21 @@ typedef struct AsmData
     DataType *data_type;
 
     union {
+        struct {
+            size_t name_len;
+            const char *name;
+        } function;
         AsmRegister asm_register;
-        size_t stack_location;
+        int stack_location;
         size_t static_variable_id;
     };
 } AsmData;
 
 AsmData asm_data_register(AsmRegister asm_register, DataType *data_type);
-AsmData asm_data_stack(size_t stack_location, DataType *data_type);
+AsmData asm_data_stack(int stack_location, DataType *data_type);
+AsmData asm_data_stack_variable(int stack_location, DataType *data_type);
+AsmData asm_data_function(size_t name_len, const char *name, DataType *data_type);
+AsmData asm_data_auto_deref(AsmData data);
 
 typedef struct DataSectionThing
 {
@@ -170,6 +192,8 @@ typedef struct AsmContext
 
     size_t label_count;
 
+    HashMap variable_stack_positions;
+
     size_t stack_frame_size;
     size_t stack_register_pool_len;
     size_t stack_register_pool_cap;
@@ -185,7 +209,9 @@ AsmData asm_context_add_to_data_section(AsmContext *context, char *data, size_t 
 
 size_t asm_context_label_new(AsmContext *context);
 
-void asm_context_extend_stack(AsmContext *context, size_t bytes);
+void asm_context_change_stack(AsmContext *context, int bytes);
+void asm_context_add_variable_stack_position(AsmContext *context, VariableID id, size_t position);
+size_t asm_context_variable_stack_position(AsmContext *context, VariableID id);
 
 AsmData asm_context_data_alloc(AsmContext *context, DataType *data_type);
 void asm_context_data_name(AsmContext *context, AsmData data);
@@ -211,6 +237,9 @@ void asm_context_setl(AsmContext *context, AsmData dst);
 void asm_context_setg(AsmContext *context, AsmData dst);
 void asm_context_setle(AsmContext *context, AsmData dst);
 void asm_context_setge(AsmContext *context, AsmData dst);
+
+void asm_context_push(AsmContext *context, AsmData data);
+void asm_context_call_function(AsmContext *context, AsmData function, AsmData return_value);
 
 void asm_context_jmp(AsmContext *context, size_t label_id);
 void asm_context_jz(AsmContext *context, size_t label_id);

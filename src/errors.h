@@ -2,10 +2,6 @@
 #define ERRORS_H_
 
 #include "lexer.h"
-#include "ast.h"
-#include "parser.h"
-#include "compile.h"
-#include "utils.h"
 
 #define UNEXPECTED_TOKEN(_tok)              \
     do {                                    \

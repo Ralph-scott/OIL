@@ -16,68 +16,83 @@ AST *ast_alloc(void)
     return ast;
 }
 
-void ast_print(const AST *ast)
+void ast_print(FILE *file, const AST *ast)
 {
     switch (ast->type) {
         case AST_NODE: {
-            printf("%.*s", (int) ast->node.len, ast->node.text);
+            fprintf(file, "%.*s", (int) ast->node.len, ast->node.text);
             break;
         }
 
         case AST_INFIX: {
-            printf("(");
-            ast_print(ast->infix.lhs);
-            printf(" %.*s ", (int) ast->infix.oper.len, ast->infix.oper.text);
-            ast_print(ast->infix.rhs);
-            printf(")");
+            fprintf(file, "(");
+            ast_print(file, ast->infix.lhs);
+            fprintf(file, " %.*s ", (int) ast->infix.oper.len, ast->infix.oper.text);
+            ast_print(file, ast->infix.rhs);
+            fprintf(file, ")");
             break;
         }
 
         case AST_PREFIX: {
-            printf("(");
-            printf("%.*s", (int) ast->prefix.oper.len, ast->prefix.oper.text);
-            ast_print(ast->prefix.node);
-            printf(")");
+            fprintf(file, "(");
+            fprintf(file, "%.*s ", (int) ast->prefix.oper.len, ast->prefix.oper.text);
+            ast_print(file, ast->prefix.node);
+            fprintf(file, ")");
             break;
         }
 
         case AST_BLOCK: {
-            printf("{ ");
+            fprintf(file, "{ ");
             for (size_t i = 0; i < ast->block.len; ++i) {
-                ast_print(ast->block.statements[i]);
-                printf("; ");
+                ast_print(file, ast->block.statements[i]);
+                if (i + 1 < ast->block.len) {
+                    fprintf(file, "; ");
+                }
             }
-            printf("}");
+            fprintf(file, "}");
+            break;
+        }
+
+        case AST_FUNCTION_CALL: {
+            ast_print(file, ast->function_call.lhs);
+            fprintf(file, "(");
+            for (size_t i = 0; i < ast->function_call.len; ++i) {
+                ast_print(file, ast->function_call.arguments[i]);
+                if (i + 1 < ast->function_call.len) {
+                    fprintf(file, ", ");
+                }
+            }
+            fprintf(file, ")");
             break;
         }
 
         case AST_IF_STATEMENT: {
-            printf("if ");
-            ast_print(ast->if_statement.condition);
-            printf(" ");
-            ast_print(ast->if_statement.if_branch);
+            fprintf(file, "if ");
+            ast_print(file, ast->if_statement.condition);
+            fprintf(file, " ");
+            ast_print(file, ast->if_statement.if_branch);
             if (ast->if_statement.else_branch != NULL) {
-                printf(" else ");
-                ast_print(ast->if_statement.else_branch);
+                fprintf(file, " else ");
+                ast_print(file, ast->if_statement.else_branch);
             }
             break;
         }
 
         case AST_WHILE_LOOP: {
-            printf("while ");
-            ast_print(ast->while_loop.condition);
-            printf(" ");
-            ast_print(ast->while_loop.body);
+            fprintf(file, "while ");
+            ast_print(file, ast->while_loop.condition);
+            fprintf(file, " ");
+            ast_print(file, ast->while_loop.body);
             break;
         }
 
         case AST_DECLARATION: {
-            printf("(");
-            printf("%.*s: ", (int) ast->declaration.name.len, ast->declaration.name.text);
-            ast_print(ast->declaration.type);
-            printf(" = ");
-            ast_print(ast->declaration.value);
-            printf(")");
+            fprintf(file, "(");
+            fprintf(file, "%.*s: ", (int) ast->declaration.name.len, ast->declaration.name.text);
+            ast_print(file, ast->declaration.type);
+            fprintf(file, " = ");
+            ast_print(file, ast->declaration.value);
+            fprintf(file, ")");
             break;
         }
     }
@@ -106,6 +121,15 @@ void ast_free(AST *ast)
                 ast_free(ast->block.statements[i]);
             }
             free(ast->block.statements);
+            break;
+        }
+
+        case AST_FUNCTION_CALL: {
+            ast_free(ast->function_call.lhs);
+            for (size_t i = 0; i < ast->function_call.len; ++i) {
+                ast_free(ast->function_call.arguments[i]);
+            }
+            free(ast->function_call.arguments);
             break;
         }
 

@@ -16,15 +16,12 @@ typedef struct VariableID
 
 typedef struct Variable
 {
-    size_t id;
     DataType *data_type;
 } Variable;
 
 typedef struct SymbolTable
 {
     HashMap symbols;
-
-    size_t variable_id;
 
     size_t scope_id;
 
@@ -33,11 +30,18 @@ typedef struct SymbolTable
     size_t *scopes;
 } SymbolTable;
 
-SymbolTable symbol_table_new(AST *ast);
+uint32_t variable_id_hash(const void *_key);
+bool variable_id_equals(const void *_lhs, const void *_rhs);
 
-Variable symbol_table_variable(SymbolTable *table, const char *name, const size_t name_len);
+SymbolTable symbol_table_new(void);
+
+void symbol_table_scan(SymbolTable *table, AST *ast);
+
+Variable symbol_table_variable(SymbolTable *table, size_t name_len, const char *name);
+VariableID symbol_table_variable_id(SymbolTable *table, size_t name_len, const char *name);
 
 void symbol_table_begin_scope(SymbolTable *table);
+void symbol_table_add_variable(SymbolTable *table, size_t name_len, const char *name, Variable variable);
 void symbol_table_end_scope(SymbolTable *table);
 
 void symbol_table_free(SymbolTable *table);

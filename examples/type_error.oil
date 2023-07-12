@@ -2,4 +2,5 @@ a: int  = 0; // ok
 b: s32  = a; // also ok (int is an alias for s32)
 c: s64  = b; // error
 d: #int = a; // also an error
+e: #s64 = d; // also an error
 0;

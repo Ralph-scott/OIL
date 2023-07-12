@@ -165,6 +165,8 @@ Token lexer_next(Lexer *lexer)
             case ':': { type = TOKEN_COLON; ++lexer->pos; break; }
             case ';': { type = TOKEN_SEMICOLON; ++lexer->pos; break; }
 
+            case ',': { type = TOKEN_COMMA; ++lexer->pos; break; }
+
             default: {
                 type = TOKEN_INVALID;
 

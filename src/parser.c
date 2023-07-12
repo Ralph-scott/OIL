@@ -67,50 +67,107 @@ static AST *parse_block_or_brackets(Lexer *lexer)
 {
     if (lexer_peek(lexer).type != TOKEN_LEFT_CURLY) {
         return parse_brackets_or_node(lexer);
+    } else {
+        return parse_block(lexer);
     }
-    return parse_block(lexer);
 }
 
 static AST *parse_prefix(Lexer *lexer)
 {
-    Token token = lexer_peek(lexer);
+    if (!IS_PREFIX[lexer_peek(lexer).type]) {
+        return parse_block_or_brackets(lexer);
+    }
 
-    if (IS_PREFIX[token.type]) {
+    AST *ast = ast_alloc();
+
+    ast->type = AST_PREFIX;
+    ast->prefix = (ASTPrefix) {
+        .oper = lexer_next(lexer),
+        .node = parse_prefix(lexer)
+    };
+
+    return ast;
+}
+
+static AST *parse_function_calls(Lexer *lexer)
+{
+    AST *lhs = parse_prefix(lexer);
+
+    loop {
+        if (lexer_peek(lexer).type != TOKEN_LEFT_PAREN) {
+            return lhs;
+        }
+
+        lexer_next(lexer);
+
         AST *ast = ast_alloc();
 
-        ast->type = AST_PREFIX;
-        ast->prefix = (ASTPrefix) {
-            .oper = lexer_next(lexer),
-            .node = parse_prefix(lexer)
+        ast->type = AST_FUNCTION_CALL;
+        ast->function_call = (ASTFunctionCall) {
+            .lhs = lhs,
+            .len = 0,
+            .cap = 256
         };
 
-        return ast;
-    } else {
-        return parse_block_or_brackets(lexer);
+        ast->function_call.arguments = malloc(sizeof(*ast->function_call.arguments) * ast->function_call.cap);
+
+        if (ast->function_call.arguments == NULL) {
+            ALLOCATION_ERROR();
+        }
+
+        loop {
+            AST *argument = parse_expr(lexer);
+
+            if (ast->function_call.len >= ast->function_call.cap) {
+                while (ast->function_call.len >= ast->function_call.cap) {
+                    ast->function_call.cap *= 2;
+                }
+                ast->function_call.arguments = realloc(ast->function_call.arguments, sizeof(*ast->function_call.arguments) * ast->function_call.cap);
+
+
+                if (ast->function_call.arguments == NULL) {
+                    ALLOCATION_ERROR();
+                }
+            }
+
+            ast->function_call.arguments[ast->function_call.len++] = argument;
+
+            Token token = lexer_next(lexer);
+
+            if (token.type == TOKEN_RIGHT_PAREN) {
+                break;
+            }
+
+            if (token.type != TOKEN_COMMA) {
+                UNEXPECTED_TOKEN(token);
+            }
+        }
+
+        lhs = ast;
     }
 }
 
 static AST *parse_infix_DM_or_prefix(Lexer *lexer)
 {
-    AST *lhs = parse_prefix(lexer);
+    AST *lhs = parse_function_calls(lexer);
 
     loop {
         Token token = lexer_peek(lexer);
 
-        if (token.type == TOKEN_OPER_MUL || token.type == TOKEN_OPER_DIV) {
-            AST *ast = ast_alloc();
-
-            ast->type = AST_INFIX;
-            ast->infix = (ASTInfix) {
-                .oper = lexer_next(lexer),
-                .lhs = lhs,
-                .rhs = parse_prefix(lexer)
-            };
-
-            lhs = ast;
-        } else {
+        if (token.type != TOKEN_OPER_MUL && token.type != TOKEN_OPER_DIV) {
             return lhs;
         }
+
+        AST *ast = ast_alloc();
+
+        ast->type = AST_INFIX;
+        ast->infix = (ASTInfix) {
+            .oper = lexer_next(lexer),
+            .lhs = lhs,
+            .rhs = parse_function_calls(lexer)
+        };
+
+        lhs = ast;
     }
 }
 
@@ -121,20 +178,20 @@ static AST *parse_infix_AS_or_DM(Lexer *lexer)
     loop {
         Token token = lexer_peek(lexer);
 
-        if (token.type == TOKEN_OPER_ADD || token.type == TOKEN_OPER_SUB) {
-            AST *ast = ast_alloc();
-
-            ast->type = AST_INFIX;
-            ast->infix = (ASTInfix) {
-                .oper = lexer_next(lexer),
-                .lhs = lhs,
-                .rhs = parse_infix_DM_or_prefix(lexer)
-            };
-
-            lhs = ast;
-        } else {
+        if (token.type != TOKEN_OPER_ADD && token.type != TOKEN_OPER_SUB) {
             return lhs;
         }
+
+        AST *ast = ast_alloc();
+
+        ast->type = AST_INFIX;
+        ast->infix = (ASTInfix) {
+            .oper = lexer_next(lexer),
+            .lhs = lhs,
+            .rhs = parse_infix_DM_or_prefix(lexer)
+        };
+
+        lhs = ast;
     }
 }
 
@@ -145,25 +202,25 @@ static AST *parse_infix_condition_or_AS(Lexer *lexer)
     loop {
         Token token = lexer_peek(lexer);
 
-        if (token.type == TOKEN_OPER_EQUALS
-         || token.type == TOKEN_OPER_LT
-         || token.type == TOKEN_OPER_GT
-         || token.type == TOKEN_OPER_LT_OR_EQUALS
-         || token.type == TOKEN_OPER_GT_OR_EQUALS
-         || token.type == TOKEN_OPER_NOT_EQUALS) {
-            AST *ast = ast_alloc();
-
-            ast->type = AST_INFIX;
-            ast->infix = (ASTInfix) {
-                .oper = lexer_next(lexer),
-                .lhs = lhs,
-                .rhs = parse_infix_AS_or_DM(lexer)
-            };
-
-            lhs = ast;
-        } else {
+        if (token.type != TOKEN_OPER_EQUALS
+         && token.type != TOKEN_OPER_LT
+         && token.type != TOKEN_OPER_GT
+         && token.type != TOKEN_OPER_LT_OR_EQUALS
+         && token.type != TOKEN_OPER_GT_OR_EQUALS
+         && token.type != TOKEN_OPER_NOT_EQUALS) {
             return lhs;
         }
+
+        AST *ast = ast_alloc();
+
+        ast->type = AST_INFIX;
+        ast->infix = (ASTInfix) {
+            .oper = lexer_next(lexer),
+            .lhs = lhs,
+            .rhs = parse_infix_AS_or_DM(lexer)
+        };
+
+        lhs = ast;
     }
 }
 
@@ -277,8 +334,8 @@ AST *parse_statements(Lexer *lexer)
 
     ast->type = AST_BLOCK;
     ast->block = (ASTBlock) {
-        .len        = 0,
-        .cap        = 256,
+        .len = 0,
+        .cap = 256
     };
 
     ast->block.statements = malloc(sizeof(*ast->block.statements) * ast->block.cap);

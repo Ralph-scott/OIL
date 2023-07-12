@@ -41,6 +41,11 @@ static char *string_literal_to_string(char *text, size_t text_len)
                 break;
             }
 
+            case '0': {
+                out_text[out_text_len++] = '\0';
+                break;
+            }
+
             default: {
                 out_text[out_text_len++] = text[i];
                 break;
@@ -59,9 +64,14 @@ static AsmData compile_node(Compiler *compiler, AST *ast)
 {
     switch (ast->node.type) {
         case TOKEN_IDENT: {
-            Variable variable = symbol_table_variable(&compiler->table, ast->node.text, ast->node.len);
+            Variable variable      = symbol_table_variable(&compiler->table, ast->node.len, ast->node.text);
+            VariableID variable_id = symbol_table_variable_id(&compiler->table, ast->node.len, ast->node.text);
 
-            return asm_data_stack(variable.id * 8, variable.data_type);
+            if (ast->data_type->type == TYPE_FUNCTION) {
+                return asm_data_function(ast->node.len, ast->node.text, ast->data_type);
+            }
+
+            return asm_data_stack_variable(asm_context_variable_stack_position(&compiler->asm_context, variable_id), variable.data_type);
         }
 
         case TOKEN_NUMBER: {
@@ -79,7 +89,7 @@ static AsmData compile_node(Compiler *compiler, AST *ast)
 
         case TOKEN_STRING: {
             char *literal = string_literal_to_string(ast->node.text, ast->node.len);
-            return asm_context_add_to_data_section(&compiler->asm_context, literal, strlen(literal), ast->data_type);
+            return asm_context_add_to_data_section(&compiler->asm_context, literal, strlen(literal) + 1, ast->data_type);
         }
 
         default: {
@@ -292,11 +302,46 @@ static AsmData compile_while_loop(Compiler *compiler, AST *ast)
     return body;
 }
 
+static AsmData compile_function_call(Compiler *compiler, AST *ast)
+{
+    AsmData function = compile_ast(compiler, ast->function_call.lhs);
+    AsmData return_value = asm_context_data_alloc(&compiler->asm_context, ast->data_type);
+
+    AsmData *function_args = malloc(sizeof(*function_args) * ast->function_call.len);
+
+    if (function_args == NULL) {
+        ALLOCATION_ERROR();
+    }
+
+    for (size_t i = 0; i < ast->function_call.len; ++i) {
+        AsmData argument = compile_ast(compiler, ast->function_call.arguments[i]);
+        asm_context_push(&compiler->asm_context, argument);
+        asm_context_data_free(&compiler->asm_context, argument);
+        function_args[i] = asm_data_stack(compiler->asm_context.stack_frame_size, ast->function_call.arguments[i]->data_type);
+    }
+
+    asm_context_call_function(&compiler->asm_context, function, return_value);
+
+    for (size_t i = 0; i < ast->function_call.len; ++i) {
+        asm_context_data_free(&compiler->asm_context, function_args[i]);
+    }
+
+    free(function_args);
+
+    asm_context_data_free(&compiler->asm_context, function);
+
+    return return_value;
+}
+
 static AsmData compile_declaration(Compiler *compiler, AST *ast)
 {
-    Variable variable = symbol_table_variable(&compiler->table, ast->declaration.name.text, ast->declaration.name.len);
+    Variable variable      = symbol_table_variable(&compiler->table, ast->declaration.name.len, ast->declaration.name.text);
+    VariableID variable_id = symbol_table_variable_id(&compiler->table, ast->declaration.name.len, ast->declaration.name.text);
 
-    AsmData asm_variable = asm_data_stack(variable.id * 8, variable.data_type);
+    asm_context_change_stack(&compiler->asm_context, 8);
+    asm_context_add_variable_stack_position(&compiler->asm_context, variable_id, compiler->asm_context.stack_frame_size);
+
+    AsmData asm_variable = asm_data_stack_variable(compiler->asm_context.stack_frame_size, variable.data_type);
 
     if (ast->declaration.value != NULL) {
         AsmData value = compile_ast(compiler, ast->declaration.value);
@@ -336,6 +381,10 @@ AsmData compile_ast(Compiler *compiler, AST *ast)
             return compile_while_loop(compiler, ast);
         }
 
+        case AST_FUNCTION_CALL: {
+            return compile_function_call(compiler, ast);
+        }
+
         case AST_DECLARATION: {
             return compile_declaration(compiler, ast);
         }
@@ -345,11 +394,30 @@ AsmData compile_ast(Compiler *compiler, AST *ast)
 void compile(AST *ast, FILE *file)
 {
     Compiler compiler = {
-        .table = symbol_table_new(ast),
+        .table = symbol_table_new(),
         .asm_context = asm_context_new(file)
     };
 
-    asm_context_extend_stack(&compiler.asm_context, 8 * compiler.table.variable_id);
+    size_t arguments_cap = 16;
+    DataType **arguments = malloc(sizeof(*arguments) * arguments_cap);
+
+    if (arguments == NULL) {
+        ALLOCATION_ERROR();
+    }
+
+    arguments[0] = data_type_reference(data_type_type(TYPE_INT8));
+
+    symbol_table_add_variable(
+        &compiler.table,
+        strlen("print"),
+        "print",
+        (Variable) {
+            .data_type = data_type_function(1, arguments_cap, arguments, data_type_type(TYPE_VOID))
+        }
+    );
+
+    symbol_table_scan(&compiler.table, ast);
+    compiler.table.scope_id = 0;
 
     AsmData data = compile_ast(&compiler, ast);
 

@@ -7,13 +7,11 @@ typedef enum TokenType
 {
     TOKEN_IDENT,
     TOKEN_NUMBER,
-
     TOKEN_STRING,
 
     TOKEN_IF,
-    TOKEN_ELSE,
-
     TOKEN_WHILE,
+    TOKEN_ELSE,
 
     TOKEN_LEFT_PAREN,
     TOKEN_RIGHT_PAREN,
@@ -41,6 +39,8 @@ typedef enum TokenType
 
     TOKEN_COLON,
     TOKEN_SEMICOLON,
+
+    TOKEN_COMMA,
 
     TOKEN_INVALID,
 
@@ -85,6 +85,7 @@ static const char *TOKEN_TYPE_TO_STRING[TOKEN_TYPES] = {
     [TOKEN_ASSIGN]            = "ASSIGN",
     [TOKEN_COLON]             = "COLON",
     [TOKEN_SEMICOLON]         = "SEMICOLON",
+    [TOKEN_COMMA]             = "TOKEN_COMMA",
     [TOKEN_INVALID]           = "INVALID",
     [TOKEN_EOF]               = "EOF"
 };
